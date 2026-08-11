@@ -10,7 +10,7 @@ pub enum AuthError {
     InvalidCredentials,
 }
 
-pub fn extract_api_key(headers: &HeaderMap) -> Option<String> {
+fn extract_api_key(headers: &HeaderMap) -> Option<String> {
     if let Some(value) = headers
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok())

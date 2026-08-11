@@ -8,11 +8,7 @@ pub fn json(data: impl Serialize, status: StatusCode) -> Response {
     json_with_headers(data, status, HeaderMap::new())
 }
 
-pub fn json_with_headers(
-    data: impl Serialize,
-    status: StatusCode,
-    mut headers: HeaderMap,
-) -> Response {
+fn json_with_headers(data: impl Serialize, status: StatusCode, mut headers: HeaderMap) -> Response {
     let body = serde_json::to_vec(&data).unwrap_or_else(|_| {
         br#"{"ok":false,"error":"Failed to encode response","code":"internal_error"}"#.to_vec()
     });

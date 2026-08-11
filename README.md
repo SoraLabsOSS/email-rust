@@ -58,12 +58,10 @@ From this repo directory (not `$HOME`):
 
 ```sh
 npm install
-npx wrangler dev
+npm run dev
 ```
 
-Wrangler is pinned in `package.json` (`4.120.1`). Bare `npx wrangler` can pull a broken latest that depends on an unpublished `miniflare` prerelease.
-
-Wrangler compiles Rust to Wasm via `scripts/build-worker.sh`, then serves the Worker.
+Use the pinned Wrangler in `package.json` (`npm run dev` / `npm run deploy`), not a bare `npx wrangler`.
 
 ```sh
 curl http://localhost:8787/health
@@ -164,48 +162,15 @@ Only `email` is required. Name fields may be omitted or empty.
 
 ## Deploy
 
-CI is [GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)
-(`.github/workflows/deploy.yml`), not Cloudflare Workers Builds. Rust cache
-lives on the GitHub runner (`Swatinem/rust-cache`), so later deploys skip
-recompiling `worker-build`.
+Push to `main` runs [GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)
+(`.github/workflows/deploy.yml` → `wrangler deploy`). Do **not** connect this
+repo in Cloudflare Workers Builds — that would duplicate CI and skip Rust cache.
 
-Public URL: `https://email.soralabs.io.vn` (Workers custom domain).
-`workers.dev` stays enabled as a fallback.
+- `https://email.soralabs.io.vn`
+- `https://email-rust.truonggiang-axyl.workers.dev`
 
-### One-time setup
+`soralabs.io.vn` must be a Cloudflare zone on this account for the custom
+domain. The marketing site can stay on Vercel (apex CNAME).
 
-1. Disconnect Git from the Worker in the Cloudflare dashboard
-   (**email-rust → Settings → Builds**) so Cloudflare does not deploy on push.
-2. Create a [Workers API token](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/#api-token)
-   (`Edit Cloudflare Workers`).
-3. Repo secrets (**Settings → Secrets and variables → Actions**):
-
-   | Secret                   | Value                                      |
-   | ------------------------ | ------------------------------------------ |
-   | `CLOUDFLARE_API_TOKEN`   | token from step 2                          |
-   | `CLOUDFLARE_ACCOUNT_ID`  | `a66e0525f65ab589563e31e7ad366ca5`         |
-
-4. `soralabs.io.vn` must be a **Cloudflare zone on this account**. Custom
-   Domains cannot attach if the site only lives on Vercel DNS. Add the domain
-   in Cloudflare (apex can still CNAME to Vercel), then `wrangler deploy`
-   creates `email.soralabs.io.vn`.
-
-Queues / secrets (once):
-
-```sh
-npx wrangler queues create email-rust-queue
-npx wrangler queues create email-rust-queue-dlq
-
-npx wrangler secret put API_KEYS --name email-rust
-npx wrangler secret put RESEND_API_KEY --name email-rust
-```
-
-These queues are **not** the TypeScript worker queues (`email-queue` /
-`email-queue-dlq`). Do not point both workers at the same queue.
-
-Manual deploy from a machine that already has Rust:
-
-```sh
-npm ci
-npx wrangler deploy
-```
+Queues (`email-rust-queue`) and secrets (`API_KEYS`, `RESEND_API_KEY`) already
+live on the Worker. Do not reuse the TypeScript queues (`email-queue`).
