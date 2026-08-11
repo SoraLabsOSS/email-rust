@@ -7,9 +7,9 @@ The current production implementation is TypeScript:
 [SoraLabsOSS/email](https://github.com/SoraLabsOSS/email).
 
 ```
-POST /api/contact
-       ↓
-    Queue (email-rust-queue)
+POST /api/contact          POST /api/newsletter
+       ↓                          ↓
+    Queue (email-rust-queue)  Resend Contacts API
        ↓
  Queue Consumer
        ↓
@@ -50,15 +50,18 @@ Fill in:
 | `API_KEYS`       | Comma-separated keys for child apps |
 | `RESEND_API_KEY` | From [Resend](https://resend.com) |
 
-Inbox / from-address / CORS live in `wrangler.toml` (`[vars]`).
+Inbox / from-address / CORS / optional `RESEND_NEWSLETTER_SEGMENT_ID` live in `wrangler.toml` (`[vars]`).
 
 ### 4. Dev
 
 From this repo directory (not `$HOME`):
 
 ```sh
+npm install
 npx wrangler dev
 ```
+
+Wrangler is pinned in `package.json` (`4.120.1`). Bare `npx wrangler` can pull a broken latest that depends on an unpublished `miniflare` prerelease.
 
 Wrangler compiles Rust to Wasm via `scripts/build-worker.sh`, then serves the Worker.
 
@@ -69,6 +72,11 @@ curl -X POST http://localhost:8787/api/contact \
   -H "Authorization: Bearer <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{"name":"Jane","email":"jane@example.com","message":"Hi","app":"landing"}'
+
+curl -X POST http://localhost:8787/api/newsletter \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com"}'
 ```
 
 Local queues are simulated. You do not need to create Cloudflare queues for `wrangler dev`.
@@ -122,6 +130,38 @@ Content-Type: application/json
 - `502` queue enqueue failed
 - `503` `API_KEYS` secret not bound
 
+### `POST /api/newsletter`
+
+Adds the address to Resend Contacts (`unsubscribed: false`). Does not send mail.
+
+Only `email` is required. Name fields may be omitted or empty.
+
+**Headers** — same as `/api/contact`.
+
+**Body**
+
+```json
+{ "email": "jane@example.com" }
+```
+
+| Field       | Required | Notes                                            |
+| ----------- | -------- | ------------------------------------------------ |
+| `email`     | yes      | subscriber address                               |
+| `firstName` | no       | Resend `first_name`; omit or `""` is fine        |
+| `lastName`  | no       | Resend `last_name`; omit or `""` is fine         |
+| `name`      | no       | split into first/last if `firstName` is omitted  |
+| `app`       | no       | child-app id for allowlist / logs; default `default` |
+
+**Responses**
+
+- `201` created (or already subscribed — `alreadyExists: true`)
+- `400` validation / invalid JSON
+- `401` missing or invalid API key
+- `403` app not in allowlist
+- `405` method not allowed
+- `502` Resend create failed
+- `503` `API_KEYS` secret not bound
+
 ## Deploy
 
 Prefer deploying from a machine that already has Rust (same as the
@@ -140,6 +180,15 @@ npx wrangler deploy
 These queues are **not** the TypeScript worker queues (`email-queue` /
 `email-queue-dlq`). Do not point both workers at the same queue.
 
-Git-connected Workers Builds will install Rust in CI when `cargo` is missing.
+Git-connected [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
+runs `npm install` from this lockfile, then the dashboard deploy command
+(`npx wrangler deploy` by default). Cloudflare uses the Wrangler version in
+`package.json` (`4.120.1`), not latest — that avoids broken `npx wrangler`
+releases such as `4.121.0` (unpublished `miniflare` prerelease).
+
+Prefer **`npm run deploy`** in **Settings → Build → Deploy command**
+(and `npm run preview` for non-production branches). That only runs the
+local binary. Leave the Build command empty; Rust compiles inside Wrangler
+via `scripts/build-worker.sh`.
+
 The first CI build is slow (`cargo install worker-build` compiles from source).
-The dashboard deploy command should stay `npx wrangler deploy`.

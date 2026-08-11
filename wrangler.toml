@@ -7,6 +7,7 @@ CONTACT_TO_EMAIL = "truonggiang.axyl@gmail.com"
 CONTACT_FROM_EMAIL = "SoraLabs Contact <noreply@soralabs.io.vn>"
 ALLOWED_ORIGINS = "*"
 ALLOWED_APPS = ""
+RESEND_NEWSLETTER_SEGMENT_ID = ""
 
 [[queues.producers]]
 binding = "EMAIL_QUEUE"

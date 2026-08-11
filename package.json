@@ -1,0 +1,15 @@
+{
+  "name": "email-rust",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler versions upload"
+  },
+  "dependencies": {
+    "wrangler": "4.120.1"
+  }
+}

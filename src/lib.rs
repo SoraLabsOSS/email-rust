@@ -19,6 +19,7 @@ use crate::lib::response::error;
 use crate::lib::secrets::read_binding;
 use crate::routes::contact::handle_contact;
 use crate::routes::health::handle_health;
+use crate::routes::newsletter::handle_newsletter;
 use crate::types::EmailQueueMessage;
 
 #[derive(Clone)]
@@ -31,6 +32,7 @@ fn router(env: Env) -> Router {
         .route("/", get(handle_health))
         .route("/health", get(handle_health))
         .route("/api/contact", any(handle_contact))
+        .route("/api/newsletter", any(handle_newsletter))
         .fallback(not_found)
         .with_state(AppState {
             env: send::SendWrapper::new(env),

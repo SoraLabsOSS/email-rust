@@ -1,9 +1,10 @@
-use resend_rs::types::{CreateEmailBaseOptions, Tag};
+use resend_rs::types::{CreateContactOptions, CreateEmailBaseOptions, Tag};
 use resend_rs::{Error, Resend};
 
 use super::secrets::read_binding;
+use super::validate::ValidatedNewsletter;
 use crate::types::EmailQueueMessage;
-use worker::Env;
+use worker::{console_log, Env};
 
 pub struct ResendSendResult {
     pub ok: bool,
@@ -13,22 +14,36 @@ pub struct ResendSendResult {
     pub retryable: bool,
 }
 
-pub async fn send_contact_email(env: &Env, message: &EmailQueueMessage) -> ResendSendResult {
-    let api_key = read_binding(env, "RESEND_API_KEY");
-    let from = read_binding(env, "CONTACT_FROM_EMAIL");
-    let to = read_binding(env, "CONTACT_TO_EMAIL");
+pub struct ResendContactResult {
+    pub ok: bool,
+    pub id: Option<String>,
+    pub already_exists: bool,
+    pub error: Option<String>,
+    pub status: u16,
+    pub retryable: bool,
+}
 
+fn create_client(env: &Env) -> Result<Resend, ResendSendResult> {
+    let api_key = read_binding(env, "RESEND_API_KEY");
     if api_key.is_empty() {
-        return ResendSendResult {
+        return Err(ResendSendResult {
             ok: false,
             id: None,
             error: Some("RESEND_API_KEY is not configured".to_string()),
             status: 503,
             retryable: false,
-        };
+        });
     }
+    Ok(Resend::new(&api_key))
+}
 
-    let resend = Resend::new(&api_key);
+pub async fn send_contact_email(env: &Env, message: &EmailQueueMessage) -> ResendSendResult {
+    let resend = match create_client(env) {
+        Ok(client) => client,
+        Err(err) => return err,
+    };
+    let from = read_binding(env, "CONTACT_FROM_EMAIL");
+    let to = read_binding(env, "CONTACT_TO_EMAIL");
     let subject = format!("[{}] {}", message.app, message.subject);
     let reply_to = format_reply_to(&message.name, &message.email);
     let app_tag = sanitize_tag(&message.app);
@@ -50,6 +65,60 @@ pub async fn send_contact_email(env: &Env, message: &EmailQueueMessage) -> Resen
             retryable: false,
         },
         Err(err) => map_resend_error(err),
+    }
+}
+
+pub async fn create_newsletter_contact(
+    env: &Env,
+    input: &ValidatedNewsletter,
+) -> ResendContactResult {
+    let resend = match create_client(env) {
+        Ok(client) => client,
+        Err(err) => {
+            return ResendContactResult {
+                ok: false,
+                id: None,
+                already_exists: false,
+                error: err.error,
+                status: err.status,
+                retryable: err.retryable,
+            };
+        }
+    };
+
+    let segment_id = read_binding(env, "RESEND_NEWSLETTER_SEGMENT_ID");
+    console_log!(
+        "Creating newsletter contact email={} app={} segment={}",
+        input.email,
+        input.app,
+        if segment_id.is_empty() {
+            "none"
+        } else {
+            &segment_id
+        }
+    );
+
+    let mut contact = CreateContactOptions::new(&input.email).with_unsubscribed(false);
+    if !input.first_name.is_empty() {
+        contact = contact.with_first_name(&input.first_name);
+    }
+    if !input.last_name.is_empty() {
+        contact = contact.with_last_name(&input.last_name);
+    }
+    if !segment_id.is_empty() {
+        contact = contact.with_segment(&segment_id);
+    }
+
+    match resend.contacts.create(contact).await {
+        Ok(id) => ResendContactResult {
+            ok: true,
+            id: Some(id.to_string()),
+            already_exists: false,
+            error: None,
+            status: 201,
+            retryable: false,
+        },
+        Err(err) => map_contact_error(err),
     }
 }
 
@@ -87,6 +156,34 @@ fn map_resend_error(err: Error) -> ResendSendResult {
             status: 502,
             retryable: true,
         },
+    }
+}
+
+fn is_already_exists(status: u16, message: &str) -> bool {
+    status == 409 || message.to_ascii_lowercase().contains("already exists")
+}
+
+fn map_contact_error(err: Error) -> ResendContactResult {
+    let mapped = map_resend_error(err);
+    let message = mapped.error.clone().unwrap_or_default();
+    if is_already_exists(mapped.status, &message) {
+        return ResendContactResult {
+            ok: true,
+            id: None,
+            already_exists: true,
+            error: None,
+            status: 409,
+            retryable: false,
+        };
+    }
+
+    ResendContactResult {
+        ok: mapped.ok,
+        id: None,
+        already_exists: false,
+        error: mapped.error,
+        status: mapped.status,
+        retryable: mapped.retryable,
     }
 }
 

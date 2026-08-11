@@ -30,6 +30,16 @@ pub struct ContactAcceptedResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct NewsletterAcceptedResponse {
+    pub ok: bool,
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub already_exists: Option<bool>,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ErrorResponse {
     pub ok: bool,
     pub error: String,
