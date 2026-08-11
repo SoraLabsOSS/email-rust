@@ -166,11 +166,17 @@ Push to `main` runs [GitHub Actions](https://developers.cloudflare.com/workers/c
 (`.github/workflows/deploy.yml` → `wrangler deploy`). Do **not** connect this
 repo in Cloudflare Workers Builds — that would duplicate CI and skip Rust cache.
 
-- `https://email.soralabs.io.vn`
 - `https://email-rust.truonggiang-axyl.workers.dev`
 
-`soralabs.io.vn` must be a Cloudflare zone on this account for the custom
-domain. The marketing site can stay on Vercel (apex CNAME).
+`email.soralabs.io.vn` is not attached yet: that hostname is not in a
+Cloudflare zone on this account (the marketing site is on Vercel). Add
+`soralabs.io.vn` to Cloudflare, then put this back in `wrangler.toml`:
+
+```toml
+[[routes]]
+pattern = "email.soralabs.io.vn"
+custom_domain = true
+```
 
 Queues (`email-rust-queue`) and secrets (`API_KEYS`, `RESEND_API_KEY`) already
 live on the Worker. Do not reuse the TypeScript queues (`email-queue`).
