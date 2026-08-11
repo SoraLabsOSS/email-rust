@@ -2,5 +2,26 @@ name = "email-rust"
 main = "build/index.js"
 compatibility_date = "2026-08-11"
 
+[vars]
+CONTACT_TO_EMAIL = "truonggiang.axyl@gmail.com"
+CONTACT_FROM_EMAIL = "SoraLabs Contact <noreply@soralabs.io.vn>"
+ALLOWED_ORIGINS = "*"
+ALLOWED_APPS = ""
+
+[[queues.producers]]
+binding = "EMAIL_QUEUE"
+queue = "email-rust-queue"
+
+[[queues.consumers]]
+queue = "email-rust-queue"
+max_batch_size = 5
+max_batch_timeout = 2
+max_retries = 3
+dead_letter_queue = "email-rust-queue-dlq"
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 [build]
 command = "cargo install -q \"worker-build@^0.8\" && worker-build --release"
