@@ -24,4 +24,4 @@ enabled = true
 invocation_logs = true
 
 [build]
-command = "cargo install -q \"worker-build@^0.8\" && worker-build --release"
+command = "sh scripts/build-worker.sh"
