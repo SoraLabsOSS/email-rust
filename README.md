@@ -164,8 +164,33 @@ Only `email` is required. Name fields may be omitted or empty.
 
 ## Deploy
 
-Prefer deploying from a machine that already has Rust (same as the
-[Cloudflare Rust guide](https://developers.cloudflare.com/workers/languages/rust/#4-deploy-your-worker-project)):
+CI is [GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)
+(`.github/workflows/deploy.yml`), not Cloudflare Workers Builds. Rust cache
+lives on the GitHub runner (`Swatinem/rust-cache`), so later deploys skip
+recompiling `worker-build`.
+
+Public URL: `https://email.soralabs.io.vn` (Workers custom domain).
+`workers.dev` stays enabled as a fallback.
+
+### One-time setup
+
+1. Disconnect Git from the Worker in the Cloudflare dashboard
+   (**email-rust → Settings → Builds**) so Cloudflare does not deploy on push.
+2. Create a [Workers API token](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/#api-token)
+   (`Edit Cloudflare Workers`).
+3. Repo secrets (**Settings → Secrets and variables → Actions**):
+
+   | Secret                   | Value                                      |
+   | ------------------------ | ------------------------------------------ |
+   | `CLOUDFLARE_API_TOKEN`   | token from step 2                          |
+   | `CLOUDFLARE_ACCOUNT_ID`  | `a66e0525f65ab589563e31e7ad366ca5`         |
+
+4. `soralabs.io.vn` must be a **Cloudflare zone on this account**. Custom
+   Domains cannot attach if the site only lives on Vercel DNS. Add the domain
+   in Cloudflare (apex can still CNAME to Vercel), then `wrangler deploy`
+   creates `email.soralabs.io.vn`.
+
+Queues / secrets (once):
 
 ```sh
 npx wrangler queues create email-rust-queue
@@ -173,25 +198,14 @@ npx wrangler queues create email-rust-queue-dlq
 
 npx wrangler secret put API_KEYS --name email-rust
 npx wrangler secret put RESEND_API_KEY --name email-rust
-
-npx wrangler deploy
 ```
 
 These queues are **not** the TypeScript worker queues (`email-queue` /
 `email-queue-dlq`). Do not point both workers at the same queue.
 
-Git-connected [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
-runs `npm install` from this lockfile, then the dashboard deploy command
-(`npx wrangler deploy` by default). Cloudflare uses the Wrangler version in
-`package.json` (`4.120.1`), not latest — that avoids broken `npx wrangler`
-releases such as `4.121.0` (unpublished `miniflare` prerelease).
+Manual deploy from a machine that already has Rust:
 
-Prefer **`npm run deploy`** in **Settings → Build → Deploy command**
-(and `npm run preview` for non-production branches). That only runs the
-local binary. Leave the Build command empty; Rust compiles inside Wrangler
-via `scripts/build-worker.sh`.
-
-Cloudflare build cache only stores npm (`~/.npm`), not Rust. The build script
-keeps rustup/cargo/`target` under that npm cache on CI (`WORKERS_CI=1`).
-The first build is still slow (`rustup` + compile `worker-build` from source);
-later builds should reuse the toolchain instead of doing that every time.
+```sh
+npm ci
+npx wrangler deploy
+```
