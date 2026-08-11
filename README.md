@@ -191,4 +191,7 @@ Prefer **`npm run deploy`** in **Settings → Build → Deploy command**
 local binary. Leave the Build command empty; Rust compiles inside Wrangler
 via `scripts/build-worker.sh`.
 
-The first CI build is slow (`cargo install worker-build` compiles from source).
+Cloudflare build cache only stores npm (`~/.npm`), not Rust. The build script
+keeps rustup/cargo/`target` under that npm cache on CI (`WORKERS_CI=1`).
+The first build is still slow (`rustup` + compile `worker-build` from source);
+later builds should reuse the toolchain instead of doing that every time.
