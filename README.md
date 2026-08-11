@@ -168,15 +168,5 @@ repo in Cloudflare Workers Builds — that would duplicate CI and skip Rust cach
 
 - `https://email-rust.truonggiang-axyl.workers.dev`
 
-`email.soralabs.io.vn` is not attached yet: that hostname is not in a
-Cloudflare zone on this account (the marketing site is on Vercel). Add
-`soralabs.io.vn` to Cloudflare, then put this back in `wrangler.toml`:
-
-```toml
-[[routes]]
-pattern = "email.soralabs.io.vn"
-custom_domain = true
-```
-
 Queues (`email-rust-queue`) and secrets (`API_KEYS`, `RESEND_API_KEY`) already
 live on the Worker. Do not reuse the TypeScript queues (`email-queue`).
