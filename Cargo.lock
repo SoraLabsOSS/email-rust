@@ -207,10 +207,12 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "js-sys",
+ "reqwest",
  "resend-rs",
  "serde",
  "serde_json",
  "tower-service",
+ "urlencoding",
  "uuid",
  "worker",
  "worker-macros",

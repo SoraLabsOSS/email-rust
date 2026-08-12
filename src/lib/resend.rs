@@ -4,7 +4,8 @@ use resend_rs::{Error, Resend};
 use super::secrets::read_binding;
 use super::validate::ValidatedNewsletter;
 use crate::types::EmailQueueMessage;
-use worker::{console_log, Env};
+use worker::{console_error, console_log, Env};
+use reqwest::Client;
 
 pub struct ResendSendResult {
     pub ok: bool,
@@ -97,6 +98,7 @@ pub async fn create_newsletter_contact(
             &segment_id
         }
     );
+    let api_key = read_binding(env, "RESEND_API_KEY");
 
     let mut contact = CreateContactOptions::new(&input.email).with_unsubscribed(false);
     if !input.first_name.is_empty() {
@@ -109,13 +111,19 @@ pub async fn create_newsletter_contact(
         contact = contact.with_segment(&segment_id);
     }
 
-    // Resend's contacts.create() may succeed even if the contact already exists,
-    // so we pre-check with contacts.get() to make `already_exists` reliable.
-    let mut already_exists = false;
-    if let Ok(existing) = resend.contacts.get(&input.email).await {
-        // `id` is present when the contact exists.
-        already_exists = !existing.id.to_string().is_empty();
-    }
+    // Resend's contacts.create() may succeed even if the contact already exists.
+    // We therefore pre-check with a raw HTTP GET and set `already_exists` reliably.
+    let already_exists = match newsletter_contact_exists_raw(&api_key, &input.email).await {
+        Ok(v) => v,
+        Err(e) => {
+            console_error!(
+                "Newsletter pre-check raw failed email={} error={}",
+                input.email,
+                e
+            );
+            false
+        }
+    };
 
     match resend.contacts.create(contact).await {
         Ok(id) => ResendContactResult {
@@ -128,6 +136,43 @@ pub async fn create_newsletter_contact(
         },
         Err(err) => map_contact_error(err),
     }
+}
+
+async fn newsletter_contact_exists_raw(
+    api_key: &str,
+    email: &str,
+) -> Result<bool, String> {
+    if api_key.is_empty() {
+        return Ok(false);
+    }
+
+    // Resend API: GET /contacts/{id_or_email}
+    let encoded_email = urlencoding::encode(email);
+    let url = format!("https://api.resend.com/contacts/{encoded_email}");
+
+    let client = Client::new();
+    let resp = client
+        .get(&url)
+        .bearer_auth(api_key)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.status().is_success() {
+        return Ok(false);
+    }
+
+    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let id = body
+        .get("id")
+        .and_then(|v| v.as_str())
+        .or_else(|| {
+            body.get("data")
+                .and_then(|d| d.get("id"))
+                .and_then(|v| v.as_str())
+        });
+
+    Ok(id.is_some() && !id.unwrap_or_default().is_empty())
 }
 
 fn map_resend_error(err: Error) -> ResendSendResult {
