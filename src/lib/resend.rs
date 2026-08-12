@@ -109,11 +109,19 @@ pub async fn create_newsletter_contact(
         contact = contact.with_segment(&segment_id);
     }
 
+    // Resend's contacts.create() may succeed even if the contact already exists,
+    // so we pre-check with contacts.get() to make `already_exists` reliable.
+    let mut already_exists = false;
+    if let Ok(existing) = resend.contacts.get(&input.email).await {
+        // `id` is present when the contact exists.
+        already_exists = !existing.id.to_string().is_empty();
+    }
+
     match resend.contacts.create(contact).await {
         Ok(id) => ResendContactResult {
             ok: true,
             id: Some(id.to_string()),
-            already_exists: false,
+            already_exists,
             error: None,
             status: 201,
             retryable: false,
