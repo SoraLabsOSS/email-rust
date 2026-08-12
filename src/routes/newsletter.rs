@@ -5,7 +5,8 @@ use axum::response::Response;
 
 use crate::lib::auth::{authorize, is_app_allowed, AuthError};
 use crate::lib::resend::create_newsletter_contact;
-use crate::lib::response::{error, json};
+use crate::lib::ratelimit::check_newsletter_rate_limits;
+use crate::lib::response::{error, error_with_retry_after, json};
 use crate::lib::validate::validate_newsletter_body;
 use crate::types::NewsletterAcceptedResponse;
 use crate::AppState;
@@ -70,6 +71,17 @@ pub async fn handle_newsletter(
             StatusCode::FORBIDDEN,
             "App is not allowed",
             "app_not_allowed",
+        );
+    }
+
+    // Upstash rate limiting (IP + email).
+    let rate = check_newsletter_rate_limits(&state.env, &headers, &validated.email).await;
+    if !rate.allowed {
+        return error_with_retry_after(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Rate limited",
+            "rate_limited",
+            rate.retry_after_seconds.unwrap_or(0),
         );
     }
 

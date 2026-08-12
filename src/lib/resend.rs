@@ -4,8 +4,8 @@ use resend_rs::{Error, Resend};
 use super::secrets::read_binding;
 use super::validate::ValidatedNewsletter;
 use crate::types::EmailQueueMessage;
-use worker::{console_error, console_log, Env};
 use reqwest::Client;
+use worker::{console_error, console_log, Env};
 
 pub struct ResendSendResult {
     pub ok: bool,
@@ -138,10 +138,7 @@ pub async fn create_newsletter_contact(
     }
 }
 
-async fn newsletter_contact_exists_raw(
-    api_key: &str,
-    email: &str,
-) -> Result<bool, String> {
+async fn newsletter_contact_exists_raw(api_key: &str, email: &str) -> Result<bool, String> {
     if api_key.is_empty() {
         return Ok(false);
     }
@@ -163,14 +160,11 @@ async fn newsletter_contact_exists_raw(
     }
 
     let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let id = body
-        .get("id")
-        .and_then(|v| v.as_str())
-        .or_else(|| {
-            body.get("data")
-                .and_then(|d| d.get("id"))
-                .and_then(|v| v.as_str())
-        });
+    let id = body.get("id").and_then(|v| v.as_str()).or_else(|| {
+        body.get("data")
+            .and_then(|d| d.get("id"))
+            .and_then(|v| v.as_str())
+    });
 
     Ok(id.is_some() && !id.unwrap_or_default().is_empty())
 }

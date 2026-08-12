@@ -5,7 +5,8 @@ use axum::response::Response;
 
 use crate::lib::auth::{authorize, is_app_allowed, AuthError};
 use crate::lib::client::{get_client_ip, get_user_agent};
-use crate::lib::response::{error, json};
+use crate::lib::ratelimit::check_contact_rate_limits;
+use crate::lib::response::{error, error_with_retry_after, json};
 use crate::lib::secrets::now_iso;
 use crate::lib::validate::validate_contact_body;
 use crate::types::{ContactAcceptedResponse, EmailQueueMessage};
@@ -71,6 +72,17 @@ pub async fn handle_contact(
             StatusCode::FORBIDDEN,
             "App is not allowed",
             "app_not_allowed",
+        );
+    }
+
+    // Upstash rate limiting (IP + sender email + global).
+    let rate = check_contact_rate_limits(&state.env, &headers, &validated.email).await;
+    if !rate.allowed {
+        return error_with_retry_after(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Rate limited",
+            "rate_limited",
+            rate.retry_after_seconds.unwrap_or(0),
         );
     }
 

@@ -32,3 +32,27 @@ pub fn error(status: StatusCode, message: &str, code: &'static str) -> Response 
         status,
     )
 }
+
+pub fn error_with_retry_after(
+    status: StatusCode,
+    message: &str,
+    code: &'static str,
+    retry_after_seconds: u64,
+) -> Response {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Retry-After",
+        HeaderValue::from_str(&retry_after_seconds.to_string()).unwrap(),
+    );
+
+    json_with_headers(
+        ErrorResponse {
+            ok: false,
+            error: message.to_string(),
+            code: Some(code),
+            retry_after_seconds: Some(retry_after_seconds),
+        },
+        status,
+        headers,
+    )
+}

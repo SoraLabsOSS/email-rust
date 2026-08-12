@@ -16,7 +16,7 @@ POST /api/contact          POST /api/newsletter
    Resend Email API
 ```
 
-Rate limiting (Upstash) is not ported yet.
+Rate limiting (Upstash) is enabled (fixed-window via Upstash Redis REST).
 
 ## Clone and run
 
@@ -49,6 +49,8 @@ Fill in:
 | ---------------- | --------------------------------- |
 | `API_KEYS`       | Comma-separated keys for child apps |
 | `RESEND_API_KEY` | From [Resend](https://resend.com) |
+| `UPSTASH_REDIS_REST_URL` | From [Upstash Redis](https://console.upstash.com) |
+| `UPSTASH_REDIS_REST_TOKEN` | From Upstash Redis |
 
 Inbox / from-address / CORS / optional `RESEND_NEWSLETTER_SEGMENT_ID` live in `wrangler.toml` (`[vars]`).
 
