@@ -212,7 +212,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tower-service",
- "urlencoding",
  "uuid",
  "worker",
  "worker-macros",
@@ -1017,9 +1016,9 @@ dependencies = [
 
 [[package]]
 name = "resend-rs"
-version = "0.29.0"
+version = "0.30.0-rc1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "652de8104c956ca098bdb97f1e3221fa0f06305d5cc65a1e4909301d8698aeeb"
+checksum = "0643d37329ff114148f374f7fdbbbd82756b155127bfee4559558a9472878b45"
 dependencies = [
  "ecow",
  "getrandom 0.4.3",
